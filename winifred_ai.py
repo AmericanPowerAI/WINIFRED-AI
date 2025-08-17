@@ -1140,13 +1140,13 @@ def main():
     
     parser = argparse.ArgumentParser(description='WINIFRED AI - Advanced Repository Management System')
     parser.add_argument('--mode', choices=['cli', 'web'], default='cli', 
-                       help='Run mode: cli (interactive) or web (API server)')
+                       help='Run mode: cli (interactive) or web (dashboard)')
     parser.add_argument('--workspace', default='./winifred_workspace',
                        help='Workspace directory for WINIFRED AI')
     parser.add_argument('--host', default='localhost',
-                       help='Web API host (web mode only)')
-    parser.add_argument('--port', type=int, default=5000,
-                       help='Web API port (web mode only)')
+                       help='Web interface host (web mode only)')
+    parser.add_argument('--port', type=int, default=8080,
+                       help='Web interface port (web mode only)')
     
     args = parser.parse_args()
     
@@ -1155,13 +1155,51 @@ def main():
         cli = WinifredCLI()
         cli.run()
     else:
-        # Run Web Server (completely self-contained)
+        # Run Web Interface
         winifred = WinifredAI(args.workspace)
         winifred.start()
         
         try:
-            server = SelfContainedWebServer(winifred, args.host, args.port)
-            server.start()
+            # Simple built-in web server
+            import socket
+            import threading
+            
+            def handle_client(client_socket):
+                try:
+                    request = client_socket.recv(4096).decode('utf-8')
+                    
+                    # Simple response
+                    response = """HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n
+<!DOCTYPE html>
+<html>
+<head><title>WINIFRED AI</title></head>
+<body>
+<h1>🤖 WINIFRED AI Running!</h1>
+<p>System Status: """ + str(winifred.get_system_status()) + """</p>
+<p>Use CLI mode for full functionality: <code>python3 winifred_ai.py --mode cli</code></p>
+</body>
+</html>"""
+                    
+                    client_socket.send(response.encode('utf-8'))
+                except:
+                    pass
+                finally:
+                    client_socket.close()
+            
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server_socket.bind((args.host, args.port))
+            server_socket.listen(5)
+            
+            print(f"🌐 WINIFRED Web Interface running on http://{args.host}:{args.port}")
+            print("💡 For full functionality, use CLI mode: python3 winifred_ai.py --mode cli")
+            
+            while True:
+                client_socket, address = server_socket.accept()
+                client_thread = threading.Thread(target=handle_client, args=(client_socket,))
+                client_thread.daemon = True
+                client_thread.start()
+                
         except KeyboardInterrupt:
             print("\n🛑 Shutting down...")
         finally:
